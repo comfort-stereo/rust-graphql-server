@@ -1,0 +1,33 @@
+type Mutation {
+  login(username: String!, password: String!): AuthResult!
+  refresh(sessionToken: String!): AuthResult!
+  logout(sessionToken: String!): Boolean!
+  createUser(username: String!, password: String!): User!
+}
+
+"DateTime"
+scalar DateTimeUtc
+
+type AuthResult {
+  sessionToken: String!
+}
+
+type Query {
+  user(id: Uuid!): User
+  userByUsername(username: String!): User
+}
+
+type User {
+  id: Uuid!
+  createdAt: DateTimeUtc!
+  updatedAt: DateTimeUtc!
+  username: String!
+}
+
+"Uuid"
+scalar Uuid
+
+schema {
+  query: Query
+  mutation: Mutation
+}

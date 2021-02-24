@@ -1,0 +1,105 @@
+{
+  "db": "PostgreSQL",
+  "606364c79e0990deb07dfbe6c32b3d302d083ec5333f3a5ce04113c38a041100": {
+    "query": "SELECT * FROM users WHERE username = $1",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "updated_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "password_hash",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "94a12621ddb012605b1269faef42934e90c3c4c19581667f83418d2b6aca7e9d": {
+    "query": "INSERT INTO users (id, username, password_hash) VALUES ($1, $2, $3)",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "e4568529cfbdc9207c1ba481ae77489e756927d45b7963842215098d51bc3d0b": {
+    "query": "SELECT * FROM users WHERE id = ANY($1)",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "updated_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "password_hash",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "UuidArray"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  }
+}
