@@ -81,11 +81,9 @@ async fn run(config: Config) -> Result<()> {
         .await
         .expect("to connect to redis");
 
-    log::info!("Listening on port {}...", config.port);
-
-    let mut app = Server::with_state(State::new(config.clone(), db, redis));
-    app.at("/graphql").post(graphql);
-    app.listen(format!("0.0.0.0:{}", &config.port)).await?;
+    let mut server = Server::with_state(State::new(config.clone(), db, redis));
+    server.at("/graphql").post(graphql);
+    server.listen(format!("0.0.0.0:{}", &config.port)).await?;
 
     Ok(())
 }
