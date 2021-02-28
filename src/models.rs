@@ -9,6 +9,8 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub username: String,
+    pub email: String,
+    pub email_verified_at: Option<DateTime<Utc>>,
     pub password_hash: String,
 }
 
@@ -28,5 +30,13 @@ impl User {
 
     pub fn username(&self) -> &str {
         &self.username
+    }
+
+    pub fn email(&self) -> &str {
+        &self.email
+    }
+
+    pub fn email_verified_at(&self) -> &Option<DateTime<Utc>> {
+        &self.email_verified_at
     }
 }

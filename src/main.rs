@@ -74,6 +74,8 @@ fn generate() {
 }
 
 async fn run(config: Config) -> Result<()> {
+    log::debug!("Running with config: {:#?}", config);
+
     let db = connect_to_db(&config)
         .await
         .expect("to connect to the database");

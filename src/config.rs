@@ -11,8 +11,13 @@ const REDIS_URL_VARIABLE: &str = "REDIS_URL";
 const SESSION_TOKEN_SECRET_VARIABLE: &str = "SESSION_TOKEN_SECRET";
 const SESSION_TOKEN_EXPIRATION_SECONDS_VARIABLE: &str = "SESSION_TOKEN_EXPIRATION_SECONDS";
 const PASSWORD_HASH_COST_VARIABLE: &str = "PASSWORD_HASH_COST";
-const USER_VERIFICATION_EMAIL_ADDRESS_VARIABLE: &str = "USER_VERIFICATION_EMAIL_ADDRESS";
-const USER_VERIFICATION_EMAIL_PASSWORD_VARIABLE: &str = "USER_VERIFICATION_EMAIL_PASSWORD";
+const EMAIL_SMTP_VARIABLE: &str = "EMAIL_SMTP";
+const EMAIL_SMTP_PORT_VARIABLE: &str = "EMAIL_SMTP_PORT";
+const EMAIL_SMTP_USE_STARTTLS_VARIABLE: &str = "EMAIL_SMTP_USE_STARTTLS";
+const EMAIL_VERIFICATION_EMAIL_ADDRESS_VARIABLE: &str = "EMAIL_VERIFICATION_EMAIL_ADDRESS";
+const EMAIL_VERIFICATION_EMAIL_PASSWORD_VARIABLE: &str = "EMAIL_VERIFICATION_EMAIL_PASSWORD";
+const EMAIL_VERIFICATION_CODE_EXPIRATION_SECONDS_VARIABLE: &str =
+    "EMAIL_VERIFICATION_CODE_EXPIRATION_SECONDS";
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -23,8 +28,12 @@ pub struct Config {
     pub session_token_secret: SessionTokenSecret,
     pub session_token_expiration_seconds: u32,
     pub password_hash_cost: u32,
-    pub user_verification_email_address: String,
-    pub user_verification_email_password: String,
+    pub email_smtp: String,
+    pub email_smtp_port: u16,
+    pub email_smtp_use_starttls: bool,
+    pub email_verification_email_address: String,
+    pub email_verification_email_password: String,
+    pub email_verification_code_expiration_seconds: u32,
 }
 
 impl Config {
@@ -46,8 +55,14 @@ impl Config {
             )),
             session_token_expiration_seconds: var(SESSION_TOKEN_EXPIRATION_SECONDS_VARIABLE),
             password_hash_cost: var(PASSWORD_HASH_COST_VARIABLE),
-            user_verification_email_address: var(USER_VERIFICATION_EMAIL_ADDRESS_VARIABLE),
-            user_verification_email_password: var(USER_VERIFICATION_EMAIL_PASSWORD_VARIABLE),
+            email_smtp: var(EMAIL_SMTP_VARIABLE),
+            email_smtp_port: var(EMAIL_SMTP_PORT_VARIABLE),
+            email_smtp_use_starttls: var(EMAIL_SMTP_USE_STARTTLS_VARIABLE),
+            email_verification_email_address: var(EMAIL_VERIFICATION_EMAIL_ADDRESS_VARIABLE),
+            email_verification_email_password: var(EMAIL_VERIFICATION_EMAIL_PASSWORD_VARIABLE),
+            email_verification_code_expiration_seconds: var(
+                EMAIL_VERIFICATION_CODE_EXPIRATION_SECONDS_VARIABLE,
+            ),
         }
     }
 }

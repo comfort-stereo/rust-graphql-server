@@ -66,6 +66,7 @@ impl Mutation {
         &self,
         context: &Context,
         username: String,
+        email: String,
         password: String,
     ) -> FieldResult<User> {
         if context
@@ -75,7 +76,7 @@ impl Mutation {
             .is_some()
         {
             return Err(FieldError::new(
-                "The username is already in use.",
+                "Username is already in use.",
                 graphql_value!({ "code": "username-taken" }),
             ));
         }
@@ -94,14 +95,30 @@ impl Mutation {
             ));
         }
 
-        if let Some(id) = context.executor().create_user(&username, &password).await {
-            Ok(context.executor().find_user(id).await.unwrap())
+        if let Some(user) = context
+            .executor()
+            .create_user(&username, &email, &password)
+            .await
+        {
+            Ok(user)
         } else {
             Err(FieldError::new(
                 "Failed to create user.",
                 graphql_value!({ "code": "unknown" }),
             ))
         }
+    }
+
+    async fn verify_user_email_address(
+        &self,
+        context: &Context,
+        user_id: Uuid,
+        verification_code: String,
+    ) -> bool {
+        context
+            .executor()
+            .verify_user_email_address(user_id, &verification_code)
+            .await
     }
 }
 

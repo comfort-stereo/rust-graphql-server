@@ -17,6 +17,8 @@ hmac = "0.10.1"
 juniper = "0.15.3"
 jwt = "0.13.0"
 lazy_static = "1.4.0"
+lettre = { version = "0.10.0-beta.1", features = ["async-std1"] }
+rand = "0.8.3"
 redis = { version = "0.20.0", features = ["aio", "async-std-comp", "connection-manager"] }
 serde = "1.0.123"
 sha2 = "0.9.3"

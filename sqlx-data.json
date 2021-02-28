@@ -1,5 +1,18 @@
 {
   "db": "PostgreSQL",
+  "044576083df8698798ff890f39356dd588512e145fc990942031ca44fe1ccbb9": {
+    "query": "UPDATE users SET email_verified_at = $1 WHERE id = $2",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Timestamptz",
+          "Uuid"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "606364c79e0990deb07dfbe6c32b3d302d083ec5333f3a5ce04113c38a041100": {
     "query": "SELECT * FROM users WHERE username = $1",
     "describe": {
@@ -26,6 +39,16 @@
         },
         {
           "ordinal": 4,
+          "name": "email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "email_verified_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
           "name": "password_hash",
           "type_info": "Varchar"
         }
@@ -40,26 +63,14 @@
         false,
         false,
         false,
+        false,
+        true,
         false
       ]
     }
   },
-  "94a12621ddb012605b1269faef42934e90c3c4c19581667f83418d2b6aca7e9d": {
-    "query": "INSERT INTO users (id, username, password_hash) VALUES ($1, $2, $3)",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Varchar",
-          "Varchar"
-        ]
-      },
-      "nullable": []
-    }
-  },
-  "e4568529cfbdc9207c1ba481ae77489e756927d45b7963842215098d51bc3d0b": {
-    "query": "SELECT * FROM users WHERE id = ANY($1)",
+  "843923b9a0257cf80f1dff554e7dc8fdfc05f489328e8376513124dfb42996e3": {
+    "query": "SELECT * FROM users WHERE id = $1",
     "describe": {
       "columns": [
         {
@@ -84,13 +95,23 @@
         },
         {
           "ordinal": 4,
+          "name": "email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "email_verified_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
           "name": "password_hash",
           "type_info": "Varchar"
         }
       ],
       "parameters": {
         "Left": [
-          "UuidArray"
+          "Uuid"
         ]
       },
       "nullable": [
@@ -98,6 +119,67 @@
         false,
         false,
         false,
+        false,
+        true,
+        false
+      ]
+    }
+  },
+  "c1a9c1ca87dc66f66b5155f1517ce07a6935557a1a09bb9e85c9de3eff69b923": {
+    "query": "\n            INSERT INTO users (id, username, email, password_hash)\n            VALUES ($1, $2, $3, $4)\n            RETURNING *\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "updated_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "email_verified_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "password_hash",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Varchar",
+          "Varchar",
+          "Varchar"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
         false
       ]
     }

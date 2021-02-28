@@ -2,7 +2,8 @@ type Mutation {
   login(username: String!, password: String!): AuthResult!
   refresh(sessionToken: String!): AuthResult!
   logout(sessionToken: String!): Boolean!
-  createUser(username: String!, password: String!): User!
+  createUser(username: String!, email: String!, password: String!): User!
+  verifyUserEmailAddress(userId: Uuid!, verificationCode: String!): Boolean!
 }
 
 "DateTime"
@@ -22,6 +23,8 @@ type User {
   createdAt: DateTimeUtc!
   updatedAt: DateTimeUtc!
   username: String!
+  email: String!
+  emailVerifiedAt: DateTimeUtc
 }
 
 "Uuid"

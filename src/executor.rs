@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use chrono::Utc;
+use std::time::Duration;
 
-use async_trait::async_trait;
-use dataloader::{non_cached::Loader, BatchFn};
+use lettre::{transport::smtp::authentication::Credentials, Message, SmtpTransport, Transport};
+use rand::Rng;
 use redis::{aio::ConnectionManager, AsyncCommands};
-use sqlx::{query_as, PgPool};
+use sqlx::{query, query_as, PgPool};
 use uuid::Uuid;
 
 use crate::{
@@ -15,13 +16,11 @@ use crate::{
 
 pub struct Executor {
     state: State,
-    users: UserLoader,
 }
 
 impl Executor {
     pub fn new(state: State) -> Self {
-        let users = UserLoader::new(UserBatcher::new(state.db.clone())).with_yield_count(100);
-        Self { state, users }
+        Self { state }
     }
 
     fn config(&self) -> &Config {
@@ -36,24 +35,150 @@ impl Executor {
         self.state.redis.clone()
     }
 
-    pub async fn create_user(&self, username: &str, password: &str) -> Option<Uuid> {
+    pub async fn create_user(&self, username: &str, email: &str, password: &str) -> Option<User> {
         let Config {
             password_hash_cost, ..
         } = self.config();
 
         let id = Uuid::new_v4();
         let password_hash = bcrypt::hash(password, *password_hash_cost).unwrap();
-        query_as!(
+        let user = query_as!(
             User,
-            "INSERT INTO users (id, username, password_hash) VALUES ($1, $2, $3)",
+            "
+            INSERT INTO users (id, username, email, password_hash)
+            VALUES ($1, $2, $3, $4)
+            RETURNING *
+            ",
             id,
             username,
+            email,
             password_hash,
         )
-        .execute(self.db())
+        .fetch_one(self.db())
         .await
-        .map(|_| id)
-        .ok()
+        .ok()?;
+
+        let verification_code = self.generate_verification_code();
+        self.register_email_verification_code(id, email, &verification_code)
+            .await;
+        self.send_email_verification_code(username, email, &verification_code)
+            .await;
+
+        Some(user)
+    }
+
+    fn generate_verification_code(&self) -> String {
+        let mut rng = rand::thread_rng();
+        (0..6).map(|_| rng.gen_range('A'..'Z')).collect()
+    }
+
+    fn create_email_verification_key(&self, user_id: Uuid, email: &str) -> String {
+        format!("verify/{}/{}", user_id, email)
+    }
+
+    async fn register_email_verification_code(
+        &self,
+        user_id: Uuid,
+        email: &str,
+        verification_code: &str,
+    ) {
+        let Config {
+            email_verification_code_expiration_seconds,
+            ..
+        } = self.config();
+
+        let verification_key = self.create_email_verification_key(user_id, email);
+
+        self.redis()
+            .set_ex::<String, String, ()>(
+                verification_key,
+                verification_code.into(),
+                *email_verification_code_expiration_seconds as usize,
+            )
+            .await
+            .expect("to refresh session token");
+    }
+
+    async fn send_email_verification_code(
+        &self,
+        username: &str,
+        email: &str,
+        verification_code: &str,
+    ) {
+        let Config {
+            email_smtp,
+            email_smtp_port,
+            email_smtp_use_starttls,
+            email_verification_email_address,
+            email_verification_email_password,
+            ..
+        } = self.config();
+
+        let message = Message::builder()
+            .from(
+                format!("Amble <{}>", email_verification_email_address)
+                    .parse()
+                    .unwrap(),
+            )
+            .to(format!("{} <{}>", username, email).parse().unwrap())
+            .subject("Verify your account")
+            .body(format!("Your verification code is: {}", verification_code))
+            .unwrap();
+
+        let relay = if *email_smtp_use_starttls {
+            SmtpTransport::starttls_relay(email_smtp)
+        } else {
+            SmtpTransport::relay(email_smtp)
+        };
+
+        let mailer = relay
+            .expect("to create SMTP relay")
+            .port(*email_smtp_port)
+            .credentials(Credentials::new(
+                email_verification_email_address.clone(),
+                email_verification_email_password.clone(),
+            ))
+            .timeout(Some(Duration::from_secs(10)))
+            .build();
+
+        mailer
+            .send(&message)
+            .expect("to send email verification email");
+    }
+
+    pub async fn verify_user_email_address(&self, user_id: Uuid, verification_code: &str) -> bool {
+        let user = match self.find_user(user_id).await {
+            Some(user) => user,
+            None => return false,
+        };
+
+        let verification_key = self.create_email_verification_key(user.id, &user.email);
+
+        let stored_verification_code = self
+            .redis()
+            .get::<String, Option<String>>(verification_key.clone())
+            .await
+            .expect("to get stored verification code if it exists");
+
+        if stored_verification_code == Some(verification_code.into()) {
+            self.redis()
+                .del::<String, ()>(verification_key)
+                .await
+                .expect("to delete stored email verification");
+
+            let email_verified_at = Some(Utc::now());
+            query!(
+                "UPDATE users SET email_verified_at = $1 WHERE id = $2",
+                email_verified_at,
+                user_id,
+            )
+            .execute(self.db())
+            .await
+            .map(|result| result.rows_affected() != 0)
+            .expect("to set user email verification time")
+        } else {
+            false
+        }
     }
 
     pub async fn login(&self, username: &str, password: &str) -> Option<SessionToken> {
@@ -62,8 +187,7 @@ impl Executor {
         }) = &self.find_user_by_username(username).await
         {
             if bcrypt::verify(password, password_hash).unwrap() {
-                let session_token = self.create_session(*id).await;
-                Some(session_token)
+                Some(self.create_session(*id).await)
             } else {
                 None
             }
@@ -100,7 +224,7 @@ impl Executor {
                 );
 
                 self.redis()
-                    .set_ex::<String, String, String>(
+                    .set_ex::<String, String, ()>(
                         session_id.to_string(),
                         refreshed_session_token.to_string(),
                         *session_token_expiration_seconds as usize,
@@ -168,7 +292,7 @@ impl Executor {
         let session_token = SessionToken::encode(session_token_data, session_token_secret);
 
         self.redis()
-            .set_ex::<String, String, String>(
+            .set_ex::<String, String, ()>(
                 session_id.to_string(),
                 session_token.to_string(),
                 *session_token_expiration_seconds as usize,
@@ -187,7 +311,10 @@ impl Executor {
     }
 
     pub async fn find_user(&self, id: Uuid) -> Option<User> {
-        self.users.load(id).await
+        query_as!(User, "SELECT * FROM users WHERE id = $1", id)
+            .fetch_optional(self.db())
+            .await
+            .unwrap()
     }
 
     pub async fn find_user_by_username(&self, username: &str) -> Option<User> {
@@ -197,32 +324,3 @@ impl Executor {
             .unwrap()
     }
 }
-
-pub struct UserBatcher {
-    db: PgPool,
-}
-
-impl UserBatcher {
-    pub fn new(db: PgPool) -> Self {
-        Self { db }
-    }
-}
-
-#[async_trait]
-impl BatchFn<Uuid, Option<User>> for UserBatcher {
-    async fn load(&mut self, ids: &[Uuid]) -> HashMap<Uuid, Option<User>> {
-        ids.iter()
-            .map(|id| (*id, None))
-            .chain(
-                query_as!(User, "SELECT * FROM users WHERE id = ANY($1)", &ids)
-                    .fetch_all(&self.db)
-                    .await
-                    .unwrap()
-                    .into_iter()
-                    .map(|user| (user.id, Some(user))),
-            )
-            .collect()
-    }
-}
-
-pub type UserLoader = Loader<Uuid, Option<User>, UserBatcher>;
