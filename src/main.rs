@@ -93,9 +93,9 @@ fn generate() {
 async fn run(config: Config) -> Result<()> {
     log::debug!("Running with config: {:#?}", config);
 
-    log::info!("Connecting to database...");
+    log::info!("Connecting to Postgres database...");
     let db = connect_to_db(&config).await?;
-    log::info!("Connecting to redis...");
+    log::info!("Connecting to Redis database...");
     let redis = connect_to_redis(&config).await?;
 
     let mut server = Server::with_state(State::new(config.clone(), db, redis));
