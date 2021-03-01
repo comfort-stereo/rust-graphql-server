@@ -240,7 +240,8 @@ impl Executor {
 
     /// Attempt to refresh a session token. The current session token will be used to create a new
     /// session token with an extended lifespan. The current session token will be invalidated and
-    /// the new, refreshed token will be returned.
+    /// the new, refreshed token will be returned. No token will be returned if the provided session
+    /// token is invalid.
     pub async fn refresh(&self, unverified_session_token: &str) -> Result<Option<SessionToken>> {
         let Config {
             session_token_secret,
@@ -285,6 +286,9 @@ impl Executor {
         }
     }
 
+    /// Use the provided session token to terminate a session. This function will return true if the
+    /// session is terminated successfully and false otherwise. The logout will fail and return
+    /// false if the session token is invalid.
     pub async fn logout(&self, unverified_session_token: &str) -> Result<bool> {
         let Config {
             session_token_secret,
@@ -355,12 +359,14 @@ impl Executor {
         Ok(count != 0)
     }
 
+    /// Find a user by ID. This will return none if the user is not found.
     pub async fn find_user(&self, id: Uuid) -> Result<Option<User>> {
         Ok(query_as!(User, "SELECT * FROM users WHERE id = $1", id)
             .fetch_optional(self.db())
             .await?)
     }
 
+    /// Find a user by their username. This will return none if no user has the specified username.
     pub async fn find_user_by_username(&self, username: &str) -> Result<Option<User>> {
         Ok(
             query_as!(User, "SELECT * FROM users WHERE username = $1", username)
