@@ -1,29 +1,68 @@
+"All available GraphQL mutations."
 type Mutation {
-  login(username: String!, password: String!): AuthResult!
-  refresh(sessionToken: String!): AuthResult!
-  logout(sessionToken: String!): Boolean!
-  createUser(username: String!, email: String!, password: String!): User!
-  verifyUserEmailAddress(userId: Uuid!, verificationCode: String!): Boolean!
+  "Log in using a specified username and password."
+  login("The username of the user to log in as." username: String!, "The user's password" password: String!): AuthResult!
+  """
+    Attempt to refresh an active session using a session token. If successful,
+            the lifespan of the session will be extended, the current session token will be invalidated,
+            and a new session token will be returned for future authentication.
+  """
+  refresh("The session token to refresh." sessionToken: String!): AuthResult!
+  """
+    Terminate the session associated with a specified session token. The token
+            will be invalidated so it cannot be used for future authentication. This will return true
+            if the specified session token was valid and the log out operation was successful.
+  """
+  logout("The session token to invalidate." sessionToken: String!): Boolean!
+  """
+    Attempt to create a new user with the provided username, email and password.
+            Once the user is created, an email verification code will be sent to the user's email
+            address.
+  """
+  createUser(username: String!, "The password the user will use to log in." email: String!, password: String!): User!
+  """
+    Verify the current email address of a user. This will return true if the
+            verification code was valid and the email address was verified successfully.
+  """
+  verifyUserEmailAddress("The ID of the user to verify." userId: Uuid!, "The verification code that was emailed to the user." verificationCode: String!): Boolean!
 }
 
 "DateTime"
 scalar DateTimeUtc
 
+"The result of a successful authentication action."
 type AuthResult {
+  """
+    The session token to be used for future requests. This should be sent as a
+            bearer token in the 'authorization' header.
+  """
   sessionToken: String!
 }
 
+"All available GraphQL queries."
 type Query {
-  user(id: Uuid!): User
-  userByUsername(username: String!): User
+  "Find a user by their ID."
+  user("The user's ID." id: Uuid!): User
+  "Find a user by their username."
+  userByUsername("The user's username." username: String!): User
 }
 
+"Information about a user."
 type User {
+  "The unique ID of the user."
   id: Uuid!
+  "Date when the user was created."
   createdAt: DateTimeUtc!
+  "Date when the user was last updated."
   updatedAt: DateTimeUtc!
+  "The user's username."
   username: String!
+  "The user's email address."
   email: String!
+  """
+    Date when the user's email address was last verified. This will be null
+            if the email has not been verified yet.
+  """
   emailVerifiedAt: DateTimeUtc
 }
 

@@ -5,7 +5,10 @@
     "describe": {
       "columns": [],
       "parameters": {
-        "Left": ["Timestamptz", "Uuid"]
+        "Left": [
+          "Timestamptz",
+          "Uuid"
+        ]
       },
       "nullable": []
     }
@@ -51,9 +54,19 @@
         }
       ],
       "parameters": {
-        "Left": ["Text"]
+        "Left": [
+          "Text"
+        ]
       },
-      "nullable": [false, false, false, false, false, true, false]
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
     }
   },
   "843923b9a0257cf80f1dff554e7dc8fdfc05f489328e8376513124dfb42996e3": {
@@ -97,9 +110,19 @@
         }
       ],
       "parameters": {
-        "Left": ["Uuid"]
+        "Left": [
+          "Uuid"
+        ]
       },
-      "nullable": [false, false, false, false, false, true, false]
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
     }
   },
   "c1a9c1ca87dc66f66b5155f1517ce07a6935557a1a09bb9e85c9de3eff69b923": {
@@ -143,9 +166,22 @@
         }
       ],
       "parameters": {
-        "Left": ["Uuid", "Varchar", "Varchar", "Varchar"]
+        "Left": [
+          "Uuid",
+          "Varchar",
+          "Varchar",
+          "Varchar"
+        ]
       },
-      "nullable": [false, false, false, false, false, true, false]
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
     }
   }
 }

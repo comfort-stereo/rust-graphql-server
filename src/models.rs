@@ -25,29 +25,38 @@ pub struct User {
     pub password_hash: String,
 }
 
-/// Defines the fields exposed by GraphQL.
-#[graphql_object]
+/// Defines user fields exposed over GraphQL.
+#[graphql_object(description = "Information about a user.")]
 impl User {
+    #[graphql(description = "The unique ID of the user.")]
     pub fn id(&self) -> &Uuid {
         &self.id
     }
 
+    #[graphql(description = "Date when the user was created.")]
     pub fn created_at(&self) -> &DateTime<Utc> {
         &self.created_at
     }
 
+    #[graphql(description = "Date when the user was last updated.")]
     pub fn updated_at(&self) -> &DateTime<Utc> {
         &self.updated_at
     }
 
+    #[graphql(description = "The user's username.")]
     pub fn username(&self) -> &str {
         &self.username
     }
 
+    #[graphql(description = "The user's email address.")]
     pub fn email(&self) -> &str {
         &self.email
     }
 
+    #[graphql(
+        description = "Date when the user's email address was last verified. This will be null
+        if the email has not been verified yet."
+    )]
     pub fn email_verified_at(&self) -> &Option<DateTime<Utc>> {
         &self.email_verified_at
     }
