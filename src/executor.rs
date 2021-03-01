@@ -304,6 +304,8 @@ impl Executor {
         }
     }
 
+    /// Find a session by ID and return its associated session token. This will return none if the
+    /// session does not exist.
     async fn find_session(&self, session_id: Uuid) -> Result<Option<SessionToken>> {
         let Config {
             session_token_secret,
@@ -318,6 +320,8 @@ impl Executor {
             .flatten())
     }
 
+    /// Create a session for the specified user. The returned token includes the session ID, the
+    /// user's ID and a unique session token ID.
     async fn create_session(&self, user_id: Uuid) -> Result<SessionToken> {
         let Config {
             session_token_secret,
@@ -350,6 +354,8 @@ impl Executor {
         Ok(session_token)
     }
 
+    /// Terminate a session by ID. This will return true if the session was found and deleted. False
+    /// will be returned otherwise.
     async fn delete_session(&self, session_id: Uuid) -> Result<bool> {
         let count = self
             .redis()
