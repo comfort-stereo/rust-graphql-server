@@ -16,27 +16,37 @@ use crate::{
     state::State,
 };
 
+/// The business logic handler for a request.
 pub struct Executor {
     state: State,
 }
 
 impl Executor {
+    /// Create a new executor with access to the global server state.
     pub fn new(state: State) -> Self {
         Self { state }
     }
 
+    /// Access the server configuration settings.
     fn config(&self) -> &Config {
         &self.state.config
     }
 
+    /// Access the Postgres database connection pool.
     fn db(&self) -> &PgPool {
         &self.state.db
     }
 
+    /// Access the Redis database connection manager.
     fn redis(&self) -> ConnectionManager {
         self.state.redis.clone()
     }
 
+    /// Attempt to create a new user with the provided username, email and password. Once the user
+    /// is created, an email verification code will be sent to the user's email address. That same
+    /// verification code is stored temporarily in the Redis database until the code expires. To
+    /// verify a user's email address, we just make sure the verification code the user sends in
+    /// later matches the code we have stored in Redis.
     pub async fn create_user(&self, username: &str, email: &str, password: &str) -> Result<User> {
         let Config {
             password_hash_cost, ..
@@ -44,6 +54,8 @@ impl Executor {
 
         let id = Uuid::new_v4();
         let password_hash = bcrypt::hash(password, *password_hash_cost)?;
+
+        // Create the user.
         let user = query_as!(
             User,
             "
@@ -59,12 +71,15 @@ impl Executor {
         .fetch_one(self.db())
         .await?;
 
+        // Create a new verification code.
         let verification_code = self.generate_verification_code();
 
+        // Put the verification code in the Redis database.
         log::info!("Registering email verification code: {}", verification_code);
         self.register_email_verification_code(id, email, &verification_code)
             .await?;
 
+        // Send the same verification code to the user's email address.
         log::info!("Sending email verification code: {}", verification_code);
         if self
             .send_email_verification_code(username, email, &verification_code)
@@ -80,15 +95,21 @@ impl Executor {
         Ok(user)
     }
 
+    /// Create a new user-friendly verification code. As of now, these are just a 6 character long
+    /// strings of upper-case letters.
     fn generate_verification_code(&self) -> String {
         let mut rng = rand::thread_rng();
         (0..6).map(|_| rng.gen_range('A'..'Z')).collect()
     }
 
+    /// Create the key a verification code can be stored under in the Redis database.
     fn create_email_verification_key(&self, user_id: Uuid, email: &str) -> String {
         format!("verify/{}/{}", user_id, email)
     }
 
+    /// Put a new email verification code into the Regis database. The time it takes for the
+    /// verification code to expire is specified by the EMAIL_VERIFICATION_CODE_EXPIRATION_SECONDS
+    /// environment variable.
     async fn register_email_verification_code(
         &self,
         user_id: Uuid,
@@ -112,6 +133,8 @@ impl Executor {
         Ok(())
     }
 
+    /// Send an email verification code to a user via email. Email settings are defined by the
+    /// server configuration.
     async fn send_email_verification_code(
         &self,
         username: &str,
@@ -152,11 +175,15 @@ impl Executor {
         Ok(())
     }
 
+    /// Attempt to verify a user's email address using the provided verification code. This function
+    /// will return true if the verification is successful and false otherwise. The verification
+    /// will fail if the user does not exist or the verification code is invalid.
     pub async fn verify_user_email_address(
         &self,
         user_id: Uuid,
         verification_code: &str,
     ) -> Result<bool> {
+        // Try to find the user. Return false if they don't exist.
         let user = match self.find_user(user_id).await? {
             Some(user) => user,
             None => return Ok(false),
@@ -164,16 +191,20 @@ impl Executor {
 
         let verification_key = self.create_email_verification_key(user.id, &user.email);
 
+        // Try to retrieve the stored verification code.
         let stored_verification_code = self
             .redis()
             .get::<String, Option<String>>(verification_key.clone())
             .await?;
 
+        // Verify the stored code matches the one passed in.
         if stored_verification_code == Some(verification_code.into()) {
+            // Delete the verification code from Redis. We don't need it any more.
             self.redis().del::<String, ()>(verification_key).await?;
 
+            // Mark the user as having a verified email.
             let email_verified_at = Some(Utc::now());
-            let result = query!(
+            query!(
                 "UPDATE users SET email_verified_at = $1 WHERE id = $2",
                 email_verified_at,
                 user_id,
@@ -181,12 +212,17 @@ impl Executor {
             .execute(self.db())
             .await?;
 
-            Ok(result.rows_affected() != 0)
+            // Return true. We verified the email successfully.
+            Ok(true)
         } else {
+            // Return false. The email verification failed. We didn't have a matching verification
+            // code stored.
             Ok(false)
         }
     }
 
+    // Attempt to log in using the provided credentials. If successful return a session token to be
+    // sent along with future requests. Otherwise return nothing.
     pub async fn login(&self, username: &str, password: &str) -> Result<Option<SessionToken>> {
         if let Some(User {
             id, password_hash, ..
@@ -202,6 +238,9 @@ impl Executor {
         }
     }
 
+    /// Attempt to refresh a session token. The current session token will be used to create a new
+    /// session token with an extended lifespan. The current session token will be invalidated and
+    /// the new, refreshed token will be returned.
     pub async fn refresh(&self, unverified_session_token: &str) -> Result<Option<SessionToken>> {
         let Config {
             session_token_secret,
