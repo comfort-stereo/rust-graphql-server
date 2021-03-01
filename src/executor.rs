@@ -1,5 +1,7 @@
+use anyhow::Result;
 use chrono::Utc;
 use std::time::Duration;
+use tide::log;
 
 use lettre::{transport::smtp::authentication::Credentials, Message, SmtpTransport, Transport};
 use rand::Rng;
@@ -35,13 +37,13 @@ impl Executor {
         self.state.redis.clone()
     }
 
-    pub async fn create_user(&self, username: &str, email: &str, password: &str) -> Option<User> {
+    pub async fn create_user(&self, username: &str, email: &str, password: &str) -> Result<User> {
         let Config {
             password_hash_cost, ..
         } = self.config();
 
         let id = Uuid::new_v4();
-        let password_hash = bcrypt::hash(password, *password_hash_cost).unwrap();
+        let password_hash = bcrypt::hash(password, *password_hash_cost)?;
         let user = query_as!(
             User,
             "
@@ -55,16 +57,27 @@ impl Executor {
             password_hash,
         )
         .fetch_one(self.db())
-        .await
-        .ok()?;
+        .await?;
 
         let verification_code = self.generate_verification_code();
-        self.register_email_verification_code(id, email, &verification_code)
-            .await;
-        self.send_email_verification_code(username, email, &verification_code)
-            .await;
 
-        Some(user)
+        log::info!("Registering email verification code: {}", verification_code);
+        self.register_email_verification_code(id, email, &verification_code)
+            .await?;
+
+        log::info!("Sending email verification code: {}", verification_code);
+        if self
+            .send_email_verification_code(username, email, &verification_code)
+            .await
+            .is_err()
+        {
+            log::error!(
+                "Failed to send email verification code: {}",
+                verification_code
+            );
+        }
+
+        Ok(user)
     }
 
     fn generate_verification_code(&self) -> String {
@@ -81,12 +94,11 @@ impl Executor {
         user_id: Uuid,
         email: &str,
         verification_code: &str,
-    ) {
+    ) -> Result<()> {
         let Config {
             email_verification_code_expiration_seconds,
             ..
         } = self.config();
-
         let verification_key = self.create_email_verification_key(user_id, email);
 
         self.redis()
@@ -95,8 +107,9 @@ impl Executor {
                 verification_code.into(),
                 *email_verification_code_expiration_seconds as usize,
             )
-            .await
-            .expect("to refresh session token");
+            .await?;
+
+        Ok(())
     }
 
     async fn send_email_verification_code(
@@ -104,7 +117,7 @@ impl Executor {
         username: &str,
         email: &str,
         verification_code: &str,
-    ) {
+    ) -> Result<()> {
         let Config {
             email_smtp,
             email_smtp_port,
@@ -115,24 +128,18 @@ impl Executor {
         } = self.config();
 
         let message = Message::builder()
-            .from(
-                format!("Amble <{}>", email_verification_email_address)
-                    .parse()
-                    .unwrap(),
-            )
-            .to(format!("{} <{}>", username, email).parse().unwrap())
+            .from(format!("Amble <{}>", email_verification_email_address).parse()?)
+            .to(format!("{} <{}>", username, email).parse()?)
             .subject("Verify your account")
-            .body(format!("Your verification code is: {}", verification_code))
-            .unwrap();
+            .body(format!("Your verification code is: {}", verification_code))?;
 
         let relay = if *email_smtp_use_starttls {
-            SmtpTransport::starttls_relay(email_smtp)
+            SmtpTransport::starttls_relay(email_smtp)?
         } else {
-            SmtpTransport::relay(email_smtp)
+            SmtpTransport::relay(email_smtp)?
         };
 
         let mailer = relay
-            .expect("to create SMTP relay")
             .port(*email_smtp_port)
             .credentials(Credentials::new(
                 email_verification_email_address.clone(),
@@ -141,15 +148,18 @@ impl Executor {
             .timeout(Some(Duration::from_secs(10)))
             .build();
 
-        mailer
-            .send(&message)
-            .expect("to send email verification email");
+        mailer.send(&message)?;
+        Ok(())
     }
 
-    pub async fn verify_user_email_address(&self, user_id: Uuid, verification_code: &str) -> bool {
-        let user = match self.find_user(user_id).await {
+    pub async fn verify_user_email_address(
+        &self,
+        user_id: Uuid,
+        verification_code: &str,
+    ) -> Result<bool> {
+        let user = match self.find_user(user_id).await? {
             Some(user) => user,
-            None => return false,
+            None => return Ok(false),
         };
 
         let verification_key = self.create_email_verification_key(user.id, &user.email);
@@ -157,46 +167,42 @@ impl Executor {
         let stored_verification_code = self
             .redis()
             .get::<String, Option<String>>(verification_key.clone())
-            .await
-            .expect("to get stored verification code if it exists");
+            .await?;
 
         if stored_verification_code == Some(verification_code.into()) {
-            self.redis()
-                .del::<String, ()>(verification_key)
-                .await
-                .expect("to delete stored email verification");
+            self.redis().del::<String, ()>(verification_key).await?;
 
             let email_verified_at = Some(Utc::now());
-            query!(
+            let result = query!(
                 "UPDATE users SET email_verified_at = $1 WHERE id = $2",
                 email_verified_at,
                 user_id,
             )
             .execute(self.db())
-            .await
-            .map(|result| result.rows_affected() != 0)
-            .expect("to set user email verification time")
+            .await?;
+
+            Ok(result.rows_affected() != 0)
         } else {
-            false
+            Ok(false)
         }
     }
 
-    pub async fn login(&self, username: &str, password: &str) -> Option<SessionToken> {
+    pub async fn login(&self, username: &str, password: &str) -> Result<Option<SessionToken>> {
         if let Some(User {
             id, password_hash, ..
-        }) = &self.find_user_by_username(username).await
+        }) = &self.find_user_by_username(username).await?
         {
-            if bcrypt::verify(password, password_hash).unwrap() {
-                Some(self.create_session(*id).await)
+            if bcrypt::verify(password, password_hash)? {
+                Ok(Some(self.create_session(*id).await?))
             } else {
-                None
+                Ok(None)
             }
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub async fn refresh(&self, unverified_session_token: &str) -> Option<SessionToken> {
+    pub async fn refresh(&self, unverified_session_token: &str) -> Result<Option<SessionToken>> {
         let Config {
             session_token_secret,
             session_token_expiration_seconds,
@@ -209,9 +215,9 @@ impl Executor {
             ..
         }) = SessionToken::decode(unverified_session_token, session_token_secret)
         {
-            if let Some(current_session_token) = self.find_session(session_id).await {
+            if let Some(current_session_token) = self.find_session(session_id).await? {
                 if current_session_token.to_string() != unverified_session_token {
-                    return None;
+                    return Ok(None);
                 }
 
                 let refreshed_session_token = SessionToken::encode(
@@ -229,19 +235,18 @@ impl Executor {
                         refreshed_session_token.to_string(),
                         *session_token_expiration_seconds as usize,
                     )
-                    .await
-                    .expect("to refresh session token");
+                    .await?;
 
-                Some(refreshed_session_token)
+                Ok(Some(refreshed_session_token))
             } else {
-                None
+                Ok(None)
             }
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub async fn logout(&self, unverified_session_token: &str) -> bool {
+    pub async fn logout(&self, unverified_session_token: &str) -> Result<bool> {
         let Config {
             session_token_secret,
             ..
@@ -252,25 +257,25 @@ impl Executor {
         {
             self.delete_session(session_id).await
         } else {
-            false
+            Ok(false)
         }
     }
 
-    async fn find_session(&self, session_id: Uuid) -> Option<SessionToken> {
+    async fn find_session(&self, session_id: Uuid) -> Result<Option<SessionToken>> {
         let Config {
             session_token_secret,
             ..
         } = self.config();
 
-        self.redis()
-            .get::<String, String>(session_id.to_string())
-            .await
+        Ok(self
+            .redis()
+            .get::<String, Option<String>>(session_id.to_string())
+            .await?
             .map(|session_token| SessionToken::verify(&session_token, session_token_secret))
-            .ok()
-            .flatten()
+            .flatten())
     }
 
-    async fn create_session(&self, user_id: Uuid) -> SessionToken {
+    async fn create_session(&self, user_id: Uuid) -> Result<SessionToken> {
         let Config {
             session_token_secret,
             ..
@@ -297,30 +302,31 @@ impl Executor {
                 session_token.to_string(),
                 *session_token_expiration_seconds as usize,
             )
-            .await
-            .unwrap();
+            .await?;
 
-        session_token
+        Ok(session_token)
     }
 
-    async fn delete_session(&self, session_id: Uuid) -> bool {
-        self.redis()
-            .del::<String, String>(session_id.to_string())
-            .await
-            .is_ok()
+    async fn delete_session(&self, session_id: Uuid) -> Result<bool> {
+        let count = self
+            .redis()
+            .del::<String, u32>(session_id.to_string())
+            .await?;
+
+        Ok(count != 0)
     }
 
-    pub async fn find_user(&self, id: Uuid) -> Option<User> {
-        query_as!(User, "SELECT * FROM users WHERE id = $1", id)
+    pub async fn find_user(&self, id: Uuid) -> Result<Option<User>> {
+        Ok(query_as!(User, "SELECT * FROM users WHERE id = $1", id)
             .fetch_optional(self.db())
-            .await
-            .unwrap()
+            .await?)
     }
 
-    pub async fn find_user_by_username(&self, username: &str) -> Option<User> {
-        query_as!(User, "SELECT * FROM users WHERE username = $1", username)
-            .fetch_optional(self.db())
-            .await
-            .unwrap()
+    pub async fn find_user_by_username(&self, username: &str) -> Result<Option<User>> {
+        Ok(
+            query_as!(User, "SELECT * FROM users WHERE username = $1", username)
+                .fetch_optional(self.db())
+                .await?,
+        )
     }
 }

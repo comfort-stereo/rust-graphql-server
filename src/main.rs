@@ -50,7 +50,8 @@ fn generate() {
 
     {
         log::info!("Writing schema.gql...");
-        std::fs::write("./schema.gql", SCHEMA.as_schema_language()).expect("to write schema.gql");
+        std::fs::write("./schema.gql", SCHEMA.as_schema_language())
+            .expect("Failed to write schema.gql.");
     }
 
     {
@@ -60,28 +61,27 @@ fn generate() {
             .arg("migrate")
             .arg("run")
             .output()
-            .expect("to run sqlx migrations, the database needs to be running and sqlx-cli must be installed");
+            .expect("Failed to run sqlx migrations. To run migrations, the database needs to be running and sqlx-cli must be installed.");
 
         log::info!("Writing sqlx-data.json...");
         Command::new("cargo")
             .arg("sqlx")
             .arg("prepare")
             .output()
-            .expect("to write sqlx-data.json, the database needs to be running and sqlx-cli must be installed");
+            .expect("Failed to write sqlx-data.json, To get this data, the database needs to be running and sqlx-cli must be installed.");
     }
 
     log::info!("Done");
 }
 
+/// Run the server with the provided configuration settings.
 async fn run(config: Config) -> Result<()> {
     log::debug!("Running with config: {:#?}", config);
 
-    let db = connect_to_db(&config)
-        .await
-        .expect("to connect to the database");
-    let redis = connect_to_redis(&config)
-        .await
-        .expect("to connect to redis");
+    log::info!("Connecting to database...");
+    let db = connect_to_db(&config).await?;
+    log::info!("Connecting to redis...");
+    let redis = connect_to_redis(&config).await?;
 
     let mut server = Server::with_state(State::new(config.clone(), db, redis));
     server.at("/graphql").post(graphql);
@@ -94,11 +94,16 @@ async fn run(config: Config) -> Result<()> {
 async fn main() -> Result<()> {
     log::start();
 
+    // Parse configuration from environment variables and .env files.
     let config = Config::load().await;
+
+    // Parse command line arguments.
     let args = parse_args();
     if args.subcommand_matches("generate").is_some() {
+        // If the second argument is "generate", just run codegen and exit.
         generate();
     } else {
+        // If no sub-command was provided, start the server.
         run(config).await?;
     }
 

@@ -1,7 +1,9 @@
+use anyhow::Result;
 use juniper::{
     graphql_object, graphql_value, EmptySubscription, FieldError, FieldResult, RootNode,
 };
 use lazy_static::lazy_static;
+use tide::log;
 use uuid::Uuid;
 
 use crate::context::Context;
@@ -12,14 +14,31 @@ pub struct Query;
 const MIN_PASSWORD_LENGTH: usize = 6;
 const MAX_PASSWORD_LENGTH: usize = 255;
 
+fn convert_result<T>(result: Result<T>) -> FieldResult<T> {
+    match result {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            log::error!("{}", error);
+            Err(FieldError::new(
+                "An unknown error occurred.",
+                graphql_value!({ "code": "unknown-error" }),
+            ))
+        }
+    }
+}
+
 #[graphql_object(context = Context)]
 impl Query {
-    async fn user(&self, context: &Context, id: Uuid) -> Option<User> {
-        context.executor().find_user(id).await
+    async fn user(&self, context: &Context, id: Uuid) -> FieldResult<Option<User>> {
+        convert_result(context.executor().find_user(id).await)
     }
 
-    async fn user_by_username(&self, context: &Context, username: String) -> Option<User> {
-        context.executor().find_user_by_username(&username).await
+    async fn user_by_username(
+        &self,
+        context: &Context,
+        username: String,
+    ) -> FieldResult<Option<User>> {
+        convert_result(context.executor().find_user_by_username(&username).await)
     }
 }
 
@@ -33,7 +52,9 @@ impl Mutation {
         username: String,
         password: String,
     ) -> FieldResult<AuthResult> {
-        if let Some(session_token) = context.executor().login(&username, &password).await {
+        if let Some(session_token) =
+            convert_result(context.executor().login(&username, &password).await)?
+        {
             return Ok(AuthResult {
                 session_token: session_token.to_string(),
             });
@@ -46,7 +67,9 @@ impl Mutation {
     }
 
     async fn refresh(&self, context: &Context, session_token: String) -> FieldResult<AuthResult> {
-        if let Some(session_token) = context.executor().refresh(&session_token).await {
+        if let Some(session_token) =
+            convert_result(context.executor().refresh(&session_token).await)?
+        {
             return Ok(AuthResult {
                 session_token: session_token.to_string(),
             });
@@ -58,8 +81,8 @@ impl Mutation {
         ))
     }
 
-    async fn logout(&self, context: &Context, session_token: String) -> bool {
-        context.executor().logout(&session_token).await
+    async fn logout(&self, context: &Context, session_token: String) -> FieldResult<bool> {
+        convert_result(context.executor().logout(&session_token).await)
     }
 
     async fn create_user(
@@ -69,12 +92,14 @@ impl Mutation {
         email: String,
         password: String,
     ) -> FieldResult<User> {
-        if context
-            .executor()
-            .find_user_by_username(&username)
-            .await
-            .is_some()
-        {
+        if username.is_empty() {
+            return Err(FieldError::new(
+                "Username cannot be empty.",
+                graphql_value!({ "code": "username-empty" }),
+            ));
+        }
+
+        if convert_result(context.executor().find_user_by_username(&username).await)?.is_some() {
             return Err(FieldError::new(
                 "Username is already in use.",
                 graphql_value!({ "code": "username-taken" }),
@@ -95,18 +120,12 @@ impl Mutation {
             ));
         }
 
-        if let Some(user) = context
-            .executor()
-            .create_user(&username, &email, &password)
-            .await
-        {
-            Ok(user)
-        } else {
-            Err(FieldError::new(
-                "Failed to create user.",
-                graphql_value!({ "code": "unknown" }),
-            ))
-        }
+        convert_result(
+            context
+                .executor()
+                .create_user(&username, &email, &password)
+                .await,
+        )
     }
 
     async fn verify_user_email_address(
@@ -114,11 +133,13 @@ impl Mutation {
         context: &Context,
         user_id: Uuid,
         verification_code: String,
-    ) -> bool {
-        context
-            .executor()
-            .verify_user_email_address(user_id, &verification_code)
-            .await
+    ) -> FieldResult<bool> {
+        convert_result(
+            context
+                .executor()
+                .verify_user_email_address(user_id, &verification_code)
+                .await,
+        )
     }
 }
 
