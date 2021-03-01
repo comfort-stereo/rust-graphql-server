@@ -20,24 +20,31 @@ use db::{connect_to_db, connect_to_redis};
 use schema::SCHEMA;
 use state::State;
 
+/// Handle a GraphQL request.
 async fn graphql(mut request: Request<State>) -> tide::Result {
+    // Attempt to parse the GraphQL query from the request.
     let query: GraphQLRequest = request.body_json().await?;
+    // Initialize a context struct for the request. This context may include configuration,
+    // connections to databases, authentication info, etc..
     let context = Context::new(request).await;
+    // Execute the query using our GraphQL schema.
     let response = query.execute(&SCHEMA, &context).await;
+    // If we get an error while executing the query, return a bad request status.
     let status = if response.is_ok() {
         StatusCode::Ok
     } else {
         StatusCode::BadRequest
     };
 
-    let body = Body::from_json(&response)?;
+    // Build and return the response.
     let response = Response::builder(status)
         .content_type(mime::JSON)
-        .body(body);
+        .body(Body::from_json(&response)?);
 
     Ok(response.build())
 }
 
+/// Parse command line arguments for the server.
 fn parse_args() -> ArgMatches<'static> {
     App::new("Amble")
         .version("0.1.0")
@@ -45,15 +52,23 @@ fn parse_args() -> ArgMatches<'static> {
         .get_matches()
 }
 
+/// Generate GraphQL related files from code and database info from the current state of the
+/// database. In order for this to run successfully, the database needs to be running. Any time the
+/// GraphQL schema or database schema is updated, this should be run.
 fn generate() {
     log::info!("Writing generated files...");
 
+    // Write the derived GraphQL schema.
     {
         log::info!("Writing schema.gql...");
         std::fs::write("./schema.gql", SCHEMA.as_schema_language())
             .expect("Failed to write schema.gql.");
     }
 
+    // Run any pending sqlx migrations, then output an sqlx-data.json file derived from the current
+    // database schema. This file can be used to compile the server without having an active
+    // connection to the database. Commonly used when building an sqlx-based server in a Docker
+    // container.
     {
         log::info!("Running sqlx migrations...");
         Command::new("cargo")
@@ -92,6 +107,7 @@ async fn run(config: Config) -> Result<()> {
 
 #[async_std::main]
 async fn main() -> Result<()> {
+    // Setup server logging.
     log::start();
 
     // Parse configuration from environment variables and .env files.
