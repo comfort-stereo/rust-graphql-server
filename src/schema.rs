@@ -52,6 +52,14 @@ impl Query {
     ) -> FieldResult<Option<User>> {
         convert_result(context.executor().find_user_by_username(&username).await)
     }
+
+    #[graphql(
+        description = "Find users. As of now this just returns a list of all users. It should really
+        be paginated and have parameters."
+    )]
+    async fn users(&self, context: &Context) -> FieldResult<Vec<User>> {
+        convert_result(context.executor().find_users().await)
+    }
 }
 
 /// Mutations for the GraphQL schema.

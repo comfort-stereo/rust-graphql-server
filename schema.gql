@@ -45,6 +45,11 @@ type Query {
   user("The user's ID." id: Uuid!): User
   "Find a user by their username."
   userByUsername("The user's username." username: String!): User
+  """
+    Find users. As of now this just returns a list of all users. It should really
+            be paginated and have parameters.
+  """
+  users: [User!]!
 }
 
 "Information about a user."

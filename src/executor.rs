@@ -380,4 +380,12 @@ impl Executor {
                 .await?,
         )
     }
+
+    /// Find users. As of now this just returns a list of all users. It should really be paginated
+    /// and have parameters.
+    pub async fn find_users(&self) -> Result<Vec<User>> {
+        Ok(query_as!(User, "SELECT * FROM users ORDER BY created_at")
+            .fetch_all(self.db())
+            .await?)
+    }
 }

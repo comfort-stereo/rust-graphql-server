@@ -13,6 +13,60 @@
       "nullable": []
     }
   },
+  "4415e33af3c5f28722ded1bb3b67b2f3d6138b6257183ee353292b115fa70ac7": {
+    "query": "SELECT * FROM users ORDER BY created_at",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 2,
+          "name": "updated_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 3,
+          "name": "username",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "email",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "email_verified_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "password_hash",
+          "type_info": "Varchar"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
+    }
+  },
   "606364c79e0990deb07dfbe6c32b3d302d083ec5333f3a5ce04113c38a041100": {
     "query": "SELECT * FROM users WHERE username = $1",
     "describe": {
