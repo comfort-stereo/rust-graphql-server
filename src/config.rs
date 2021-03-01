@@ -19,6 +19,7 @@ const EMAIL_VERIFICATION_EMAIL_ADDRESS_VARIABLE: &str = "EMAIL_VERIFICATION_EMAI
 const EMAIL_VERIFICATION_EMAIL_PASSWORD_VARIABLE: &str = "EMAIL_VERIFICATION_EMAIL_PASSWORD";
 const EMAIL_VERIFICATION_CODE_EXPIRATION_SECONDS_VARIABLE: &str =
     "EMAIL_VERIFICATION_CODE_EXPIRATION_SECONDS";
+const IS_DOCKER_VARIABLE: &str = "IS_DOCKER";
 
 /// Configuration for the server. Each field is derived from an environment variable found on the
 /// host or in local ".env" and ".env.override" files.
@@ -51,6 +52,8 @@ pub struct Config {
     pub email_verification_email_password: String,
     /// The number of seconds it takes for an email verification code to expire.
     pub email_verification_code_expiration_seconds: u32,
+    /// Set to true if the server is running in a Docker container.
+    pub is_docker: bool,
 }
 
 impl Config {
@@ -63,11 +66,23 @@ impl Config {
             log::info!("Loaded environment variables from '.env' file.");
         }
 
+        let is_docker = var(IS_DOCKER_VARIABLE);
+        let database_url = if is_docker {
+            var::<String>(DATABASE_URL_VARIABLE).replace("localhost", "host.docker.internal")
+        } else {
+            var(DATABASE_URL_VARIABLE)
+        };
+        let redis_url = if is_docker {
+            var::<String>(REDIS_URL_VARIABLE).replace("localhost", "host.docker.internal")
+        } else {
+            var(REDIS_URL_VARIABLE)
+        };
+
         Config {
             port: var(PORT_VARIABLE),
-            database_url: var(DATABASE_URL_VARIABLE),
+            database_url,
             database_max_connection_count: var(DATABASE_MAX_CONNECTION_COUNT_VARIABLE),
-            redis_url: var(REDIS_URL_VARIABLE),
+            redis_url,
             session_token_secret: SessionToken::secret(&var::<String>(
                 SESSION_TOKEN_SECRET_VARIABLE,
             )),
@@ -81,6 +96,7 @@ impl Config {
             email_verification_code_expiration_seconds: var(
                 EMAIL_VERIFICATION_CODE_EXPIRATION_SECONDS_VARIABLE,
             ),
+            is_docker,
         }
     }
 }
