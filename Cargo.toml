@@ -1,5 +1,5 @@
 [package]
-name = "amble"
+name = "rust-graphql-server"
 version = "0.1.0"
 authors = ["Jake Ploskey <jake@boxed.email>"]
 edition = "2018"

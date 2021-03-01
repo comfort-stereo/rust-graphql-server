@@ -46,7 +46,7 @@ async fn graphql(mut request: Request<State>) -> tide::Result {
 
 /// Parse command line arguments for the server.
 fn parse_args() -> ArgMatches<'static> {
-    App::new("Amble")
+    App::new("rust-graphql-server")
         .version("0.1.0")
         .subcommand(SubCommand::with_name("generate"))
         .get_matches()

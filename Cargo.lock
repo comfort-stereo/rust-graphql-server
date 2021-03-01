@@ -81,32 +81,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "amble"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-std",
- "async-trait",
- "bcrypt",
- "chrono",
- "clap",
- "dataloader",
- "dotenv",
- "hmac 0.10.1",
- "juniper",
- "jwt",
- "lazy_static",
- "lettre",
- "rand 0.8.3",
- "redis",
- "serde",
- "sha2",
- "sqlx",
- "tide",
- "uuid",
-]
-
-[[package]]
 name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1985,6 +1959,32 @@ name = "route-recognizer"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56770675ebc04927ded3e60633437841581c285dc6236109ea25fbf3beb7b59e"
+
+[[package]]
+name = "rust-graphql-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "async-trait",
+ "bcrypt",
+ "chrono",
+ "clap",
+ "dataloader",
+ "dotenv",
+ "hmac 0.10.1",
+ "juniper",
+ "jwt",
+ "lazy_static",
+ "lettre",
+ "rand 0.8.3",
+ "redis",
+ "serde",
+ "sha2",
+ "sqlx",
+ "tide",
+ "uuid",
+]
 
 [[package]]
 name = "rustc_version"

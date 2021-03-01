@@ -151,7 +151,7 @@ impl Executor {
         } = self.config();
 
         let message = Message::builder()
-            .from(format!("Amble <{}>", email_verification_email_address).parse()?)
+            .from(format!("rust-graphql-server <{}>", email_verification_email_address).parse()?)
             .to(format!("{} <{}>", username, email).parse()?)
             .subject("Verify your account")
             .body(format!("Your verification code is: {}", verification_code))?;
