@@ -7,8 +7,6 @@ mod models;
 mod schema;
 mod state;
 
-use std::process::Command;
-
 use anyhow::Result;
 use clap::{App, ArgMatches, SubCommand};
 use juniper::http::GraphQLRequest;
@@ -16,7 +14,7 @@ use tide::{http::mime, log, Body, Request, Response, Server, StatusCode};
 
 use config::Config;
 use context::Context;
-use db::{connect_to_db, connect_to_redis};
+use db::{connect_to_db, connect_to_redis, run_migrations};
 use schema::SCHEMA;
 use state::State;
 
@@ -52,9 +50,7 @@ fn parse_args() -> ArgMatches<'static> {
         .get_matches()
 }
 
-/// Generate GraphQL related files from code and database info from the current state of the
-/// database. In order for this to run successfully, the database needs to be running. Any time the
-/// GraphQL schema or database schema is updated, this should be run.
+/// Write generated files. At the moment this only includes the GraphQL schema.
 fn generate() {
     log::info!("Writing generated files...");
 
@@ -63,27 +59,6 @@ fn generate() {
         log::info!("Writing schema.gql...");
         std::fs::write("./schema.gql", SCHEMA.as_schema_language())
             .expect("Failed to write schema.gql.");
-    }
-
-    // Run any pending sqlx migrations, then output an sqlx-data.json file derived from the current
-    // database schema. This file can be used to compile the server without having an active
-    // connection to the database. Commonly used when building an sqlx-based server in a Docker
-    // container.
-    {
-        log::info!("Running sqlx migrations...");
-        Command::new("cargo")
-            .arg("sqlx")
-            .arg("migrate")
-            .arg("run")
-            .output()
-            .expect("Failed to run sqlx migrations. To run migrations, the database needs to be running and sqlx-cli must be installed.");
-
-        log::info!("Writing sqlx-data.json...");
-        Command::new("cargo")
-            .arg("sqlx")
-            .arg("prepare")
-            .output()
-            .expect("Failed to write sqlx-data.json, To get this data, the database needs to be running and sqlx-cli must be installed.");
     }
 
     log::info!("Done");
@@ -97,6 +72,9 @@ async fn run(config: Config) -> Result<()> {
     let db = connect_to_db(&config).await?;
     log::info!("Connecting to Redis database...");
     let redis = connect_to_redis(&config).await?;
+
+    log::info!("Running any pending database migrations...");
+    run_migrations(&db).await?;
 
     let mut server = Server::with_state(State::new(config.clone(), db, redis));
     server.at("/graphql").post(graphql);

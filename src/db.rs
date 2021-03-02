@@ -2,13 +2,19 @@ use std::time::Duration;
 
 use async_std::task;
 use redis::{aio::ConnectionManager, Client as RedisClient, RedisResult};
-use sqlx::{postgres::PgPoolOptions, Error as SqlxError, PgPool};
+use sqlx::{
+    migrate::{Migrate, MigrateError, Migrator},
+    postgres::PgPoolOptions,
+    Error as SqlxError, PgPool,
+};
 use tide::log;
 
 use crate::config::Config;
 
 const MAX_CONNECTION_RETRIES: u64 = 20;
 const RETRY_POLLING_INTERVAL_SECONDS: u64 = 3;
+
+static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
 /// Attempt to connect to the Postgres database using the provided configuration. Connections to the
 /// database are pooled.
@@ -57,4 +63,36 @@ pub async fn connect_to_redis(Config { redis_url, .. }: &Config) -> RedisResult<
             }
         }
     }
+}
+
+/// Run all pending database migrations.
+pub async fn run_migrations(db: &PgPool) -> Result<(), MigrateError> {
+    // The majority of this function is a workaround until
+    // https://github.com/launchbadge/sqlx/pull/1061 is merged. After that's merged we can just
+    // replace all of this with "MIGRATOR.run(db).await".
+    let mut connection = db.acquire().await?;
+    connection.lock().await?;
+    connection.ensure_migrations_table().await?;
+
+    let (version, dirty) = connection.version().await?.unwrap_or((0, false));
+    if dirty {
+        return Err(MigrateError::Dirty(version));
+    }
+
+    for migration in MIGRATOR.iter() {
+        // Ignore down migrations.
+        if migration.migration_type.is_down_migration() {
+            continue;
+        }
+
+        if migration.version > version {
+            connection.apply(migration).await?;
+        } else {
+            connection.validate(migration).await?;
+        }
+    }
+
+    connection.unlock().await?;
+
+    Ok(())
 }

@@ -13,19 +13,17 @@ This is a relatively simple Rust GraphQL API server with the following features:
 # Initial Setup
 
 1. Install Rust with "rustup" on your machine.
-2. Install the "sqlx" command line utility by running:
+2. Switch to "nightly" rust using "rustup".
+3. Install the "sqlx" command line utility by running:
    ```
    cargo install sqlx-cli
    ```
-3. Install Docker and "docker-compose".
-4. Start the Postgres and Redis databases by running:
+4. Install Docker and "docker-compose".
+5. Start Docker.
+6. Start the Postgres and Redis databases by running:
 
     ```
     docker-compose up --build db redis
-    ```
-5. Run migrations for the database by running:
-    ```
-    cargo sqlx migrate run
     ```
 
 # Development Workflow
@@ -42,7 +40,23 @@ This is a relatively simple Rust GraphQL API server with the following features:
    cargo run
    ```
 
-3. You should be able to access the "http://localhost:8080/graphql" endpoint using your GraphQL client of choice. Make changes to the source code and re-run the server when you want to test your changes.
+3. The server will run all pending migrations on startup. You should be able to access the "http://localhost:8080/graphql" endpoint using your GraphQL client of choice.
+
+   Make changes to the source code, compile and re-run the server when you want to test.
+
+   If you make changes that affect the GraphQL schema, make sure to run the codegen command to update the "schema.gql" file:
+
+   ```
+   cargo run generate
+   ```
+
+   If you update or add any sqlx queries you'll get a compile error as, by default, the .env file has "SQLX_OFFLINE=true" set. To fix this, run:
+
+   ```
+   cargo sqlx prepare
+   ```
+
+   This will compare your SQL queries with the running database to update the "sqlx-data.json" file with new query information. If your queries are valid, the compile errors will go away.
 
 # Building as a Docker Container
 
@@ -62,4 +76,3 @@ This is a relatively simple Rust GraphQL API server with the following features:
 * Provide Relay-style paginated endpoints.
 * Improve GraphQL error handling.
 * Use dataloaders to reduce any N+1 problems.
-* Have the server run migrations on startup, this is currently blocked by an issue I've noticed with "sqlx" where it falsely detects changed migrations.
