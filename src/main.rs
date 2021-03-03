@@ -47,6 +47,7 @@ fn parse_args() -> ArgMatches<'static> {
     App::new("rust-graphql-server")
         .version("0.1.0")
         .subcommand(SubCommand::with_name("generate"))
+        .subcommand(SubCommand::with_name("dev"))
         .get_matches()
 }
 
@@ -94,8 +95,12 @@ async fn main() -> Result<()> {
     // Parse command line arguments.
     let args = parse_args();
     if args.subcommand_matches("generate").is_some() {
-        // If the second argument is "generate", just run codegen and exit.
+        // If the second argument is "generate", write generated files and exit.
         generate();
+    } else if args.subcommand_matches("dev").is_some() {
+        // If the second argument is "dev", write generated files and start the server.
+        generate();
+        run(config).await?;
     } else {
         // If no sub-command was provided, start the server.
         run(config).await?;
