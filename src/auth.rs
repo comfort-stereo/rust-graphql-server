@@ -1,7 +1,5 @@
-use std::{
-    fmt::{Display, Formatter, Result as FormatResult},
-    ops::Deref,
-};
+use std::fmt::{Display, Formatter, Result as FormatResult};
+use std::ops::Deref;
 
 use hmac::{Hmac, NewMac};
 use jwt::{SignWithKey, VerifyWithKey};

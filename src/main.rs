@@ -10,7 +10,8 @@ mod state;
 use anyhow::Result;
 use clap::{App, ArgMatches, SubCommand};
 use juniper::http::GraphQLRequest;
-use tide::{http::mime, log, Body, Request, Response, Server, StatusCode};
+use tide::http::mime;
+use tide::{log, Body, Request, Response, Server, StatusCode};
 
 use config::Config;
 use context::Context;

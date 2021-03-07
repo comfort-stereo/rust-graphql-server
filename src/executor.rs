@@ -1,20 +1,19 @@
 use anyhow::Result;
 use chrono::Utc;
+use lettre::transport::smtp::authentication::Credentials;
+use lettre::{Message, SmtpTransport, Transport};
+use rand::Rng;
+use redis::aio::ConnectionManager;
+use redis::AsyncCommands;
+use sqlx::{query, query_as, PgPool};
 use std::time::Duration;
 use tide::log;
-
-use lettre::{transport::smtp::authentication::Credentials, Message, SmtpTransport, Transport};
-use rand::Rng;
-use redis::{aio::ConnectionManager, AsyncCommands};
-use sqlx::{query, query_as, PgPool};
 use uuid::Uuid;
 
-use crate::{
-    auth::{SessionToken, SessionTokenData},
-    config::Config,
-    models::User,
-    state::State,
-};
+use crate::auth::{SessionToken, SessionTokenData};
+use crate::config::Config;
+use crate::models::User;
+use crate::state::State;
 
 /// The business logic handler for a request.
 pub struct Executor {

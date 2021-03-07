@@ -1,12 +1,11 @@
 use std::time::Duration;
 
 use async_std::task;
-use redis::{aio::ConnectionManager, Client as RedisClient, RedisResult};
-use sqlx::{
-    migrate::{Migrate, MigrateError, Migrator},
-    postgres::PgPoolOptions,
-    Error as SqlxError, PgPool,
-};
+use redis::aio::ConnectionManager;
+use redis::{Client as RedisClient, RedisResult};
+use sqlx::migrate::{Migrate, MigrateError, Migrator};
+use sqlx::postgres::PgPoolOptions;
+use sqlx::{Error as SqlxError, PgPool};
 use tide::log;
 
 use crate::config::Config;
